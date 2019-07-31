@@ -11,6 +11,7 @@ DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Test using 'nc 127.0.0.1 8181' <enter>
 # "any text you enter now should be echoed back to you"
 
+
 echo "envoy"
 envoy() {
   docker run \
