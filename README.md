@@ -1,6 +1,7 @@
 # consul-learn
 
 # LAB 1
+Run echo app using socat.  start server in -dev mode, and start socat and web service proxies with minimal configuration.  Verify the routing is working by testing the echo app.
 
 ## Run echo app
 This app will be used as the running service in these labs so be sure this is working.
@@ -37,7 +38,7 @@ Hello Consul Connect
 ```
 
 # LAB 2
-We previously established a connection by directly running consul connect proxy in developer mode. Realistically, services need to establish connections to dependencies over Connect. Let's register a service "web" that registers "socat" as an upstream dependency in its sidecar registration
+We previously established a connection by directly running consul connect proxy in developer mode. Realistically, services need to establish connections to dependencies over Connect. Let's register a service "web" that registers "socat" as an upstream dependency in its sidecar registration so we avoid manually starting this upstream.
 
 ## Configure web services
 ./consul.d/web.json:
