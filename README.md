@@ -93,3 +93,73 @@ nc 127.0.0.1 9191
 ```
 consul intention delete web socat
 ```
+
+# Envoy Proxy - Lab 4
+We'll start all containers using Docker's host network mode and will have a total of five containers running.
+
+1. A single Consul server
+2. An example TCP echo service as a destination
+3. An Envoy sidecar proxy for the echo service
+4. An Envoy sidecar proxy for the client service
+5. An example client service (netcat)
+
+## Build Envoy image with Consul.
+Using the Dockerfile...
+
+`docker build -t consul-envoy .`
+
+## Deploy Consul server
+This will load the docker run command as a function "envoy" in your shell you can execute.  This run command will load the envoy_demo.hcl which starts the server and configures both services.
+```
+source envoydemoRunContainer
+envoy
+
+```
+## Create services
+In order to start a proxy instance, a proxy service definition must exist on the local Consul agent. We'll create one using the sidecar service registration syntax in envoy_demo_hcl.
+```
+source envoydemoRunContainer.sh
+envoy
+docker logs -f consul-agent
+```
+
+## Run Echo service
+```
+docker run -d --network host abrarov/tcp-echo --port 9090
+```
+
+## Run proxies
+For verbose debug add "-- -l debug" to the end of these commands.  The consul connect envoy command here is connecting to the local agent directly via gRPC on port 8502 (avail by default with -dev), getting the proxy configuration from the proxy service registration and generating the required Envoy bootstrap configuration
+```
+docker run --rm -d --network host --name echo-proxy \
+  consul-envoy -sidecar-for echo
+
+docker run --rm -d --network host --name client-proxy \
+  consul-envoy -sidecar-for client -admin-bind localhost:19001
+```
+
+* "-admin-bind" on the second proxy command is needed because both proxies are running on the host network and so can't bind to the same port for their admin API.
+* "consul connect proxy" command is now "consul connect envoy" and in the ENTRYPOINT.
+
+## Run Client Service and test
+Lets simulate the service with a simple netcat process that will only talk to the client-sidecar-proxy Envoy instance.
+```
+docker run -ti --rm --network host gophernet/netcat localhost 9191
+Hello consul
+Hello consul
+```
+
+## Test Authorization
+Add a deny rule and test again.  Be sure to terminate the last test.  Open TCP sessions will work.
+```
+docker run -ti --rm --network host consul:latest intention create -deny client echo
+docker run -ti --rm --network host gophernet/netcat localhost 9191
+Hello?
+```
+Lets restore the connection and test again
+```
+docker run -ti --rm --network host consul:latest intention delete client echo
+docker run -ti --rm --network host gophernet/netcat localhost 9191
+Hello consul
+Hello consul
+```
