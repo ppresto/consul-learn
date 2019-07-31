@@ -78,3 +78,18 @@ nc 127.0.0.1 9191
 Hello Consul Connect
 Hello Consul Connect
 ```
+
+# LAB 3 - Intentions
+Intentions are used to define which services may communicate. Our connections above succeeded because in a development mode agent, the ACL system is "allow all" by default.
+
+## create deny intension and test
+
+```
+consul intention create -deny web socat
+# Now connection should fail on 9191
+nc 127.0.0.1 9191
+```
+## delete deny intension and Test
+```
+consul intention delete web socat
+```
