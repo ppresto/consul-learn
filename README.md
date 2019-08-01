@@ -94,7 +94,7 @@ nc 127.0.0.1 9191
 consul intention delete web socat
 ```
 
-# Envoy Proxy - Lab 4
+# Envoy Proxy - Lab 4 (Requires Docker Containers)
 We'll start all containers using Docker's host network mode and will have a total of five containers running.
 
 1. A single Consul server
