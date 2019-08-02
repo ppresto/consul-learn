@@ -163,3 +163,185 @@ docker run -ti --rm --network host gophernet/netcat localhost 9191
 Hello consul
 Hello consul
 ```
+
+# Lab 5: Containers - Run Consul Server/Agent
+
+## Start Server and Client nodes
+Start the consul server with container name: badger.  Mount /consul/config volume to pass configurations.  We will need to reload consul.
+```
+source load_consul_functions.sh
+consul-server
+```
+
+Discover the Server IP address using consul members command inside server container
+```
+docker exec badger consul members
+```
+
+Deploy client and join cluster
+```
+# If IP isn't 172.17.0.2 then update the client.sh -join <IP>
+source load_consul_functions.sh
+consul-client
+
+# verify client joined cluster
+docker logs fox
+docker exec fox consul members  
+
+# export Env variable to use local consul binary.
+# Note: use localhost if using container that's exporting port to host network
+export CONSUL_HTTP_ADDR=localhost:8500
+consul members
+```
+
+## Register service
+Use hashi counting service.
+```
+docker pull hashicorp/counting-service:0.0.2
+docker run -d -p 9001:9001 --name=weasel hashicorp/counting-service:0.0.2
+# Test at http://localhost:9001
+```
+
+Add service definition to the client
+```
+docker exec fox /bin/sh -c "echo '{\"service\": {\"name\": \"counting\", \"tags\": [\"go\"], \"port\": 9001}}' >> /consul/config/counting.json"
+
+# Reload Client and verify
+docker exec fox consul reload
+docker logs fox
+
+# Discover Service in DNS
+dig @127.0.0.1 -p 8600 counting.service.consul
+```
+
+## Backup data
+```
+docker exec badger consul snapshot save backup.snap
+# if persistant volume isn't set copy it.
+docker cp badger:backup.snap ./
+```
+
+## Enable ACLs on servers
+./consul.d/acl.json will enable ACL's.  Look for acl messages in logs. The consul CLI on servers will not work until fully setup.
+```
+cp ./acl/acl.json ./consul.d/acl.json
+# Restart cluster with volume mounted.
+docker logs badger | grep -i acl
+docker logs badger2 | grep -i acl
+docker logs badger3 | grep -i acl
+```
+### Create Bootstrap Token
+```
+docker exec badger consul acl bootstrap
+# save SecretID: d2c38aac-7d5b-a6b0-ceda-bc1e6f6242fe
+
+## list cluster members with the Token
+docker exec badger consul members -token "d2c38aac-7d5b-a6b0-ceda-bc1e6f6242fe"
+```
+### Export Token for better security and simplicity
+```
+export CONSUL_HTTP_TOKEN=d2c38aac-7d5b-a6b0-ceda-bc1e6f6242fe
+export CONSUL_HTTP_ADDR=localhost:8500
+consul members
+```
+
+### Create Policy (dev only) for Token
+```
+consul acl policy create -name "agent-token" -description "Agent Token Policy" -rules @acl/agent-policy.hcl
+ID:           60c048f0-610b-b83d-9623-3196e6d3594b
+Name:         agent-token
+Description:  Agent Token Policy
+Datacenters:
+Rules:
+node_prefix "" {
+   policy = "write"
+}
+service_prefix "" {
+   policy = "read"
+}
+```
+### Create an Agent Token with the policy
+```
+consul acl token create -description "Agent Token" -policy-name "agent-token"
+# save SecretID: 2d8d24b0-e77c-b3f2-bc24-26c5a757348f
+```
+
+### Add the Agent Token to all the Servers
+Update the configuration file with the agent token.
+```
+# reload all consul Servers with updated acl config
+cp ./acl/acl_token.json ./consul.d/acl.json
+docker exec badger consul reload -token 07b96db4-44dc-3ab1-6f92-17a5b4feb9e7
+docker exec badger2 consul reload -token 07b96db4-44dc-3ab1-6f92-17a5b4feb9e7
+docker exec badger3 consul reload -token 07b96db4-44dc-3ab1-6f92-17a5b4feb9e7
+
+# We shouldn't see the coordinate warning in the servers logs.  Look for "Node info in sync".
+docker logs badger | grep "Node info in sync"
+```
+
+### Test ACL configurations via API before adding ACL's to clients  
+Look at TaggedAddress. it should not be "null"!
+```
+curl http://127.0.0.1:8500/v1/catalog/nodes -H 'x-consul-token: 07b96db4-44dc-3ab1-6f92-17a5b4feb9e7'
+```
+
+### Troubleshooting (Reset ACL system)
+```
+# If issues aren't resolvable or you misplaced the bootsrap token reset the ACL system.
+# Get Index # by rerunning bootstrap command. Ex: 13
+consul acl bootstrap
+echo 13 >> <data-dir>/acl-bootstrap-reset
+```
+
+### Add ACL config to consul clients
+We can use the same token since we configured it to match any prefix.  We can start up a new client or reload with the current acl.json.  Check the logs for any errors.
+```
+consul-client   #alias from load_consul_functions.sh
+
+# full command
+docker run \
+--rm -d --name=fox \
+-v ${DIRECTORY}/consul.d:/consul/config \
+consul:latest \
+agent -node=client-1 -join=172.17.0.2
+```
+Verify client is properly configured using the API catalog endpoint.
+
+`url http://127.0.0.1:8500/v1/catalog/nodes -H 'x-consul-token: 07b96db4-44dc-3ab1-6f92-17a5b4feb9e7'`
+
+### Add Anonymous token to read members without passing token.
+```
+#create policy
+consul acl policy create -name 'list-all-nodes' -rules 'node_prefix "" { policy = "read" }'
+
+#create token for anonymous
+consul acl token update -id 00000000-0000-0000-0000-000000000002 -policy-name list-all-nodes -description "Anonymous Token - Can List Nodes"
+
+#validate consul
+unset CONSUL_HTTP_TOKEN
+consul members
+#validate dns (get NXDOMAIN error)
+dig @127.0.0.1 -p 8600 consul.service.consul
+```
+
+### Update Anonymous token's policy to read consul services
+```
+#create Policy
+consul acl policy create -name 'service-consul-read' -rules 'service "consul" { policy = "read" }'
+
+#merge policy with anonymous
+consul acl token update -id 00000000-0000-0000-0000-000000000002 --merge-policies -description "Anonymous Token - Can List Nodes" -policy-name service-consul-read
+
+#test dns query (noerror)
+dig @127.0.0.1 -p 8600 consul.service.consul
+```
+
+### Create UI Token
+```
+consul acl policy create -name "ui-policy" \
+                           -description "Necessary permissions for UI functionality" \
+                           -rules 'key_prefix"" { policy = "write" } node_prefix "" { policy = "read" } service_prefix "" { policy = "read" }'
+
+consul acl token create -description "UI Token" -policy-name "ui-policy"
+```
+Test in UI : http://localhost:8500/ui

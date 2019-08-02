@@ -1,0 +1,11 @@
+{
+  "primary_datacenter": "dc1",
+  "acl": {
+    "enabled": true,
+    "default_policy": "deny",
+    "down_policy": "extend-cache",
+    "tokens": {
+      "agent": "42bcb0f1-ea0f-f0a4-8a1d-5850ac6d6646"
+    }
+  }
+}
