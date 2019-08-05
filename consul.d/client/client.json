@@ -1,0 +1,11 @@
+{
+  "verify_incoming": true,
+  "ca_file": "/consul/config/consul-agent-ca.pem",
+  "auto_encrypt": {
+    "tls": true
+  },
+  "ports": {
+    "http": -1,
+    "https": 8501
+  }
+}

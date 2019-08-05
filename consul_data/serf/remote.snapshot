@@ -1,0 +1,7 @@
+alive: server-1.dc1 172.17.0.2:8302
+alive: server-2.dc1 172.17.0.3:8302
+clock: 1
+clock: 2
+alive: server-3.dc1 172.17.0.4:8302
+alive: server-1.dc1 172.17.0.2:8302
+alive: server-1.dc1 172.17.0.4:8302
