@@ -16,7 +16,7 @@ echo "consul-client"
 consul-client() {
   docker run \
   --rm -d --name=fox \
-  -v ${DIRECTORY}/consul.d:/consul/config \
+  -v ${DIRECTORY}/consul.d/client:/consul/config \
   consul:latest \
   agent -node=client-1 -join=172.17.0.2
 }
@@ -36,18 +36,18 @@ echo "consul-cluster"
 # acl.json will lock down servers.  you must create bootstrap token.
 consul-cluster() {
   docker run -d -p 8500:8500 -p 8600:8600/udp --name=badger \
-    -v ${DIRECTORY}/consul.d:/consul/config \
+    -v ${DIRECTORY}/consul.d/server1:/consul/config \
     -v ${DIRECTORY}/consul_data:/consul/data \
     consul:latest \
     agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0
   # Add additional servers to the cluster.
   sleep 5
   docker run -d --name=badger2 -e CONSUL_BIND_INTERFACE=eth0 \
-    -v ${DIRECTORY}/consul.d:/consul/config \
+    -v ${DIRECTORY}/consul.d/server2:/consul/config \
     consul agent -node=server-2 -dev -join=172.17.0.2
 
   docker run -d --name=badger3 -e CONSUL_BIND_INTERFACE=eth0 \
-    -v ${DIRECTORY}/consul.d:/consul/config \
+    -v ${DIRECTORY}/consul.d/server3:/consul/config \
     consul agent -node=server-3 -dev -join=172.17.0.2
 }
 

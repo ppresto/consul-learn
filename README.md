@@ -345,3 +345,27 @@ consul acl policy create -name "ui-policy" \
 consul acl token create -description "UI Token" -policy-name "ui-policy"
 ```
 Test in UI : http://localhost:8500/ui
+
+## TLS
+
+### Create CA pub/private keys
+```
+cd ./tls
+consul tls ca create
+```
+
+### Create Server cert
+```
+cd ./tls
+# repeat cert creation and copy for each node #
+consul tls cert create -server
+cp server*-1*pem consul.d/server1
+cp consul-agent-ca.pe, consul.d/server1
+```
+
+Verify the consul.d mount point is updated to include the new server# directory with keys and tls configuration.
+```
+# reload or restart each server
+docker stop badger
+docker start badger
+```
