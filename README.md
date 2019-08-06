@@ -5,7 +5,7 @@
 ## Run echo app
 This app will be used as the running service in these labs so be sure this is working.
 ```
-source socatRunEcho.sh
+source socatRunEchoContainer.sh
 socat_echo
 
 #validate your echo app
