@@ -1,0 +1,100 @@
+version: '3'
+
+networks:
+  network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.24.0.0/24
+
+services:
+  consul:
+    image: "grovemountain/consul:1.6.0-beta3"
+    ports:
+      - "8500:8500"
+    volumes:
+       - ./consul.d:/consul/config
+    restart: always
+    networks:
+      network:
+        ipv4_address: 10.24.0.11
+
+  consul-demo-gateway:
+    image: "grovemountain/consul-demo-gateway:latest"
+    ports:
+      - "8000:8000"
+    volumes:
+       - ./gateway:/app/static
+    restart: always
+    networks:
+      network:
+        ipv4_address: 10.24.0.10
+  client-proxy:
+    image: "grovemountain/consul-envoy:1.6.0-beta3-v1.11.0"
+    entrypoint: "/wait_for_consul.sh"
+    environment:
+      - CONSUL_HTTP_ADDR=http://consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+    command: "consul connect envoy -sidecar-for client"
+    network_mode: "service:consul-demo-gateway"
+
+  picture-service-cats:
+    image: "grovemountain/picture-service:latest"
+    ports:
+      - "8081:8080"
+    environment:
+      - NAME=cats
+      - VERSION=2
+    restart: always
+    networks:
+      network:
+        ipv4_address: 10.24.0.20
+  picture-proxy-cats:
+    image: "grovemountain/consul-envoy:1.6.0-beta3-v1.11.0"
+    entrypoint: "/wait_for_consul.sh"
+    environment:
+      - CONSUL_HTTP_ADDR=http://consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+    command: "consul connect envoy -sidecar-for cats"
+    network_mode: "service:picture-service-cats"
+
+  picture-service-dogs:
+    image: "grovemountain/picture-service:latest"
+    ports:
+      - "8082:8080"
+    environment:
+      - NAME=dogs
+      - VERSION=2
+    restart: always
+    networks:
+      network:
+        ipv4_address: 10.24.0.30
+  picture-proxy-dogs:
+    image: "grovemountain/consul-envoy:1.6.0-beta3-v1.11.0"
+    entrypoint: "/wait_for_consul.sh"
+    environment:
+      - CONSUL_HTTP_ADDR=http://consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+    command: "consul connect envoy -sidecar-for dogs"
+    network_mode: "service:picture-service-dogs"
+
+  picture-service-rabbits:
+    image: "grovemountain/picture-service:latest"
+    ports:
+      - "8080:8080"
+    environment:
+      - NAME=rabbits
+      - VERSION=2
+    restart: always
+    networks:
+      network:
+        ipv4_address: 10.24.0.40
+  picture-proxy-rabbits:
+    image: "grovemountain/consul-envoy:1.6.0-beta3-v1.11.0"
+    entrypoint: "/wait_for_consul.sh"
+    environment:
+      - CONSUL_HTTP_ADDR=http://consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+    command: "consul connect envoy -sidecar-for rabbits"
+    network_mode: "service:picture-service-rabbits"

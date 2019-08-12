@@ -1,0 +1,90 @@
+version: '3'
+
+services:
+
+  consul-agent-1: &consul-agent
+    image: grovemountain/consul:1.6.0-beta3
+    networks:
+      - consul-demo
+    command: "agent -retry-join consul-server-bootstrap -client 0.0.0.0"
+
+  consul-agent-2:
+    <<: *consul-agent
+
+  consul-agent-3:
+    <<: *consul-agent
+
+  consul-server-1: &consul-server
+    <<: *consul-agent
+    volumes:
+       - ./consul.d:/consul/config
+    command: "agent -server -retry-join consul-server-bootstrap -client 0.0.0.0"
+
+  consul-server-2:
+    <<: *consul-server
+
+  consul-server-bootstrap:
+    <<: *consul-agent
+    volumes:
+       - ./consul.d:/consul/config
+    ports:
+      - "8400:8400"
+      - "8500:8500"
+      - "8600:8600"
+      - "8600:8600/udp"
+    command: "agent -server -bootstrap-expect 3 -ui -client 0.0.0.0"
+
+  gateway:
+    image: grovemountain/consul-demo-gateway:0.0.2
+    volumes:
+       - ./gateway:/app/static
+    networks:
+      - consul-demo
+    ports:
+      - "8000:8000"
+
+  sidecar-gateway:
+    image: consul-envoy:latest
+    networks:
+      - consul-demo
+    command: "-sidecar-for gateway -admin-bind localhost:19001"
+    environment:
+      - CONSUL_HTTP_ADDR=10.0.1.49:8500
+
+  picture-service-cats:
+    image: grovemountain/picture-service:0.0.2
+    networks:
+      - consul-demo
+    ports:
+      - "8081:8080"
+    environment:
+      - NAME=cats
+      - VERSION=1
+  sidecar-cats:
+    image: consul-envoy:latest
+    networks:
+      - consul-demo
+    command: "-sidecar-for cats"
+    environment:
+      - CONSUL_HTTP_ADDR=10.0.1.49:8500
+
+  picture-service-dogs:
+    image: grovemountain/picture-service:0.0.2
+    networks:
+      - consul-demo
+    ports:
+      - "8083:8080"
+    environment:
+      - NAME=dogs
+      - VERSION=1
+  picture-service-rabbits:
+    image: grovemountain/picture-service:0.0.2
+    networks:
+      - consul-demo
+    ports:
+      - "8084:8080"
+    environment:
+      - NAME=rabbits
+      - VERSION=1
+networks:
+  consul-demo:

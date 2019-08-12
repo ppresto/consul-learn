@@ -15,9 +15,9 @@ DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "consul_envoy"
 consul_envoy() {
   docker run \
-  --rm -d -v${DIRECTORY}/consul.d/envoy/:/consul/config \
+  --rm -p8500:8500 -d -v${DIRECTORY}/consul.d/envoy/:/consul/config \
   --network host --name consul-envoy \
-  consul:latest agent -dev
+  consul:latest agent -server -ui -dev
 }
 
 # Lab 4 - Envoyproxy uses 9090 on network "host"
