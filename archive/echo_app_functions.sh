@@ -17,7 +17,7 @@ DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "socat_echo()"
 socat_echo() {
   docker run \
-  -d --rm --name socat_echo -p127.0.0.1:8181:8181 \
+  -d --rm -p127.0.0.1:8181:8181 \
   alpine/socat tcp-listen:8181,fork exec:"/bin/cat"
 }
 
